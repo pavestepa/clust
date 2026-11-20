@@ -1,6 +1,6 @@
 use super::*;
 
-impl Loader {
+impl Loader<'_> {
     pub(super) fn builtin_requests(&self) -> BTreeSet<String> {
         let mut names = BTreeSet::new();
         for source in &self.sources {
@@ -40,7 +40,7 @@ impl Loader {
     }
 }
 
-impl Loader {
+impl Loader<'_> {
     pub(super) fn builtins(&mut self) {
         let sources = BTreeMap::from([
             ("intrinsic", crate::intrinsics::SOURCE),

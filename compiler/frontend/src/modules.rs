@@ -37,7 +37,8 @@ struct Unit {
     items: Vec<Item>,
     children: Symbols,
 }
-struct Loader {
+struct Loader<'a> {
+    buffers: &'a BTreeMap<PathBuf, String>,
     root: PathBuf,
     sources: Vec<Source>,
     units: BTreeMap<Vec<String>, Unit>,
@@ -55,7 +56,21 @@ pub(crate) fn load_with_parser(
     _package: &str,
     parser: fn(SourceId, &str) -> crate::parser::Parsed,
 ) -> Loaded {
-    let entry = match entry.canonicalize() {
+    load_buffers(entry, &BTreeMap::new(), parser)
+}
+
+pub fn load_buffers(
+    entry: &Path,
+    buffers: &BTreeMap<PathBuf, String>,
+    parser: fn(SourceId, &str) -> crate::parser::Parsed,
+) -> Loaded {
+    let entry = match entry.canonicalize().or_else(|err| {
+        if buffers.contains_key(entry) {
+            Ok(entry.to_path_buf())
+        } else {
+            Err(err)
+        }
+    }) {
         Ok(path) => path,
         Err(error) => {
             return Loaded {
@@ -74,6 +89,7 @@ pub(crate) fn load_with_parser(
         }
     };
     let mut loader = Loader {
+        buffers,
         root: entry.parent().unwrap().into(),
         sources: vec![],
         units: BTreeMap::new(),
@@ -82,7 +98,10 @@ pub(crate) fn load_with_parser(
         diagnostics: vec![],
         parser,
     };
-    let text = fs::read_to_string(&entry);
+    let text = buffers
+        .get(&entry)
+        .cloned()
+        .map_or_else(|| fs::read_to_string(&entry), Ok);
     match text {
         Ok(text) => loader.file(
             vec![],
@@ -127,7 +146,7 @@ pub(crate) fn load_with_parser(
     }
 }
 
-impl Loader {
+impl Loader<'_> {
     fn file(
         &mut self,
         id: Vec<String>,
@@ -232,7 +251,10 @@ impl Loader {
             }
             let flat = directory.join(format!("{name}.cl"));
             let nested = child_dir.join("mod.cl");
-            let path = match (flat.is_file(), nested.is_file()) {
+            let path = match (
+                flat.is_file() || self.buffers.contains_key(&flat),
+                nested.is_file() || self.buffers.contains_key(&nested),
+            ) {
                 (true, false) => flat,
                 (false, true) => nested,
                 (true, true) => {
@@ -252,8 +274,19 @@ impl Loader {
                     continue;
                 }
             };
-            match path.canonicalize() {
-                Ok(path) if path.starts_with(&self.root) => match fs::read_to_string(&path) {
+            match path.canonicalize().or_else(|err| {
+                if self.buffers.contains_key(&path) {
+                    Ok(path.clone())
+                } else {
+                    Err(err)
+                }
+            }) {
+                Ok(path) if path.starts_with(&self.root) => match self
+                    .buffers
+                    .get(&path)
+                    .cloned()
+                    .map_or_else(|| fs::read_to_string(&path), Ok)
+                {
                     Ok(text) => self.file(child, path, child_dir, text, None),
                     Err(error) => self.diagnostics.push(Diagnostic::new(
                         "E0501",

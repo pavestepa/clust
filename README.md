@@ -78,3 +78,7 @@ These calls compile into the native program. Cargo path dependencies are support
 - **Help the next reader learn Clust.** Run an example and describe the first line or diagnostic you had to look up. A small example, a clearer error message or a failing test for an unsupported case gives contributors a concrete starting point. [Examples](examples) · [Language guide](docs/README.md)
 
 For compiler changes, the architecture guide maps syntax, type checking, ownership analysis and Rust generation to their modules. Run `cargo test --workspace --locked` to exercise the project and `cargo fmt --all -- --check` to check formatting. [Compiler architecture](docs/architecture.md)
+
+## Editor support
+
+The [VS Code extension](lsp/vscode/README.md) bundles the Rust server and syntax highlighting. Open a Clust project for compiler diagnostics, completion, navigation, rename, type hints and formatting. Other editors can run the [language server](lsp/README.md) over stdio.

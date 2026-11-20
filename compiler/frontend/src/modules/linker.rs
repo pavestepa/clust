@@ -1,6 +1,6 @@
 use super::*;
 
-impl Loader {
+impl Loader<'_> {
     pub(super) fn link(&self) -> Result<Module, Diagnostic> {
         let mut scopes = BTreeMap::new();
         for (index, (id, unit)) in self.units.iter().enumerate() {

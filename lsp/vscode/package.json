@@ -1,0 +1,63 @@
+{
+  "name": "clust-language",
+  "publisher": "clust",
+  "displayName": "Clust Language Support",
+  "description": "Clust language server and syntax highlighting",
+  "version": "0.1.1",
+  "engines": {
+    "vscode": "^1.82.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "main": "./extension.js",
+  "activationEvents": [
+    "onLanguage:clust"
+  ],
+  "dependencies": {
+    "vscode-languageclient": "9.0.1"
+  },
+  "contributes": {
+    "languages": [
+      {
+        "id": "clust",
+        "aliases": [
+          "Clust"
+        ],
+        "extensions": [
+          ".cl"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "clust",
+        "scopeName": "source.clust",
+        "path": "./syntaxes/clust.tmLanguage.json"
+      }
+    ],
+    "configuration": {
+      "title": "Clust",
+      "properties": {
+        "clust.serverPath": {
+          "type": "string",
+          "default": "",
+          "scope": "machine",
+          "description": "Installed Clust language server executable. Reload the window after changing this path."
+        }
+      }
+    }
+  },
+  "devDependencies": {
+    "@vscode/vsce": "4.1.1"
+  },
+  "scripts": {
+    "package": "node package-extension.js"
+  },
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": false
+    }
+  }
+}

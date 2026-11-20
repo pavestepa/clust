@@ -14,4 +14,8 @@ fn main() -> i32 {
     var counter = Counter.new(2);
     counter.add(3);
     return counter.read();
+
+    if true {
+        
+    }
 }

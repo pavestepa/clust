@@ -1,0 +1,237 @@
+{
+  "name": "Clust",
+  "scopeName": "source.clust",
+  "patterns": [
+    {
+      "include": "#block"
+    },
+    {
+      "include": "#line"
+    },
+    {
+      "include": "#string"
+    },
+    {
+      "name": "string.quoted.single.clust",
+      "begin": "'",
+      "end": "'",
+      "patterns": [
+        {
+          "name": "constant.character.escape.clust",
+          "match": "\\\\."
+        }
+      ]
+    },
+    {
+      "match": "\\b(class)\\s+([A-Za-z_][A-Za-z_0-9]*)",
+      "captures": {
+        "1": {
+          "name": "keyword.declaration.struct.rust storage.type.rust"
+        },
+        "2": {
+          "name": "entity.name.type.struct.rust"
+        }
+      }
+    },
+    {
+      "match": "\\b(interface)\\s+([A-Za-z_][A-Za-z_0-9]*)",
+      "captures": {
+        "1": {
+          "name": "keyword.declaration.trait.rust storage.type.rust"
+        },
+        "2": {
+          "name": "entity.name.type.trait.rust"
+        }
+      }
+    },
+    {
+      "match": "\\b(enum)\\s+([A-Za-z_][A-Za-z_0-9]*)",
+      "captures": {
+        "1": {
+          "name": "keyword.declaration.enum.rust storage.type.rust"
+        },
+        "2": {
+          "name": "entity.name.type.enum.rust"
+        }
+      }
+    },
+    {
+      "match": "\\b(fn)\\s+([A-Za-z_]\\w*)",
+      "captures": {
+        "1": {
+          "name": "keyword.other.fn.rust"
+        },
+        "2": {
+          "name": "entity.name.function.rust"
+        }
+      }
+    },
+    {
+      "match": "\\b(mod)\\s+([A-Za-z_]\\w*)",
+      "captures": {
+        "1": {
+          "name": "storage.type.rust"
+        },
+        "2": {
+          "name": "entity.name.namespace.rust"
+        }
+      }
+    },
+    {
+      "match": "\\b(const)\\s+([A-Za-z_]\\w*)",
+      "captures": {
+        "1": {
+          "name": "storage.modifier.rust"
+        },
+        "2": {
+          "name": "constant.other.caps.rust"
+        }
+      }
+    },
+    {
+      "begin": "\\b(use)\\b",
+      "beginCaptures": {
+        "1": {
+          "name": "keyword.other.rust"
+        }
+      },
+      "end": "(?=;)",
+      "patterns": [
+        {
+          "include": "#block"
+        },
+        {
+          "include": "#line"
+        },
+        {
+          "match": "\\b(crate|self|super|as)\\b",
+          "name": "keyword.other.rust"
+        },
+        {
+          "match": "\\b[A-Za-z_]\\w*(?=\\s*\\.)",
+          "name": "entity.name.namespace.rust"
+        },
+        {
+          "include": "$self"
+        }
+      ]
+    },
+    {
+      "name": "meta.attribute.rust",
+      "begin": "#\\[",
+      "end": "\\]",
+      "patterns": [
+        {
+          "include": "#string"
+        },
+        {
+          "match": "\\b[A-Za-z_]\\w*",
+          "name": "entity.name.function.attribute.rust"
+        }
+      ]
+    },
+    {
+      "name": "keyword.control.rust",
+      "match": "\\b(await|break|continue|else|for|if|match|return|while)\\b"
+    },
+    {
+      "name": "storage.modifier.visibility.rust",
+      "match": "\\bpub\\b"
+    },
+    {
+      "name": "storage.modifier.mut.rust",
+      "match": "\\bvar\\b"
+    },
+    {
+      "name": "storage.type.rust",
+      "match": "\\b(extern|let|mod|class|interface|enum)\\b"
+    },
+    {
+      "name": "storage.modifier.rust",
+      "match": "\\bconst\\b"
+    },
+    {
+      "name": "keyword.other.fn.rust",
+      "match": "\\bfn\\b"
+    },
+    {
+      "name": "keyword.other.rust",
+      "match": "\\b(as|async|dyn|extend|in|unsafe|where|weak)\\b"
+    },
+    {
+      "name": "variable.language.self.rust",
+      "match": "\\bself\\b"
+    },
+    {
+      "name": "keyword.other.rust",
+      "match": "\\b(crate|super)\\b"
+    },
+    {
+      "name": "constant.language.bool.rust",
+      "match": "\\b(true|false)\\b"
+    },
+    {
+      "name": "entity.name.type.numeric.rust",
+      "match": "\\b([iu](8|16|32|64|128|size)|f(32|64))\\b"
+    },
+    {
+      "name": "entity.name.type.primitive.rust",
+      "match": "\\b(bool|char|str)\\b"
+    },
+    {
+      "name": "constant.other.caps.rust",
+      "match": "\\b[A-Z][A-Z_0-9]+\\b"
+    },
+    {
+      "name": "entity.name.type.rust",
+      "match": "\\b[A-Z][A-Za-z_0-9]*\\b"
+    },
+    {
+      "name": "constant.numeric.rust",
+      "match": "\\b(0[xX][0-9a-fA-F_]+|0[bB][01_]+|0[oO][0-7_]+|\\d[\\d_]*(?:\\.\\d[\\d_]*)?(?:[Ee][+-]?[\\d_]+)?)(?:[iu](?:8|16|32|64|128|size)|f(?:32|64))?\\b"
+    },
+    {
+      "name": "entity.name.function.rust",
+      "match": "\\b[a-z_]\\w*(?=\\s*(?:\\(|<[^;{}()]*>\\s*\\())"
+    },
+    {
+      "name": "variable.other.property.rust",
+      "match": "(?<=\\.)[a-z_]\\w*"
+    },
+    {
+      "name": "variable.other.rust",
+      "match": "\\b[a-z_]\\w*\\b"
+    },
+    {
+      "name": "keyword.operator.rust",
+      "match": "->|=>|[+*/%=!<>&|^?-]+"
+    }
+  ],
+  "repository": {
+    "block": {
+      "name": "comment.block.clust",
+      "begin": "/\\*",
+      "end": "\\*/",
+      "patterns": [
+        {
+          "include": "#block"
+        }
+      ]
+    },
+    "line": {
+      "name": "comment.line.double-slash.clust",
+      "match": "//.*$"
+    },
+    "string": {
+      "name": "string.quoted.double.clust",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.clust",
+          "match": "\\\\."
+        }
+      ]
+    }
+  }
+}

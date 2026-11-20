@@ -1,0 +1,4 @@
+package-extension.js
+*.vsix
+.gitignore
+test/**

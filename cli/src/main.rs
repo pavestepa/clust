@@ -1,10 +1,10 @@
+use clust::{async_program, project};
 use clust_frontend::{
     modules::load,
     parser::parse,
     source::{Diagnostic, Source, SourceId},
 };
-mod async_program;
-mod project;
+mod async_command;
 use clust_semantics::OverflowChecks;
 use std::{
     env, fs,
@@ -96,14 +96,14 @@ fn run() -> Result<ExitCode, String> {
     if let Some(source) = async_program::compile(
         &fs::read_to_string(&input).map_err(|e| format!("{}: {e}", input.display()))?,
     )? {
-        return async_program::command::execute(
+        return async_command::execute(
             &args[0],
             &input,
             args[1].ends_with(".cl"),
             project,
             &source,
             program_arguments,
-            async_program::command::BuildOptions {
+            async_command::BuildOptions {
                 release,
                 object,
                 output,

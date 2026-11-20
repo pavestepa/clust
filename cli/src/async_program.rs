@@ -10,7 +10,6 @@ use syn::{
 };
 
 mod borrows;
-pub(crate) mod command;
 
 const BUILTINS: &[&str] = &["channel", "actor", "spawn", "mutex", "drop"];
 const METHODS: &[&str] = &[
