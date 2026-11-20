@@ -1,0 +1,163 @@
+//! Acceptance cases of the Clust Memory Model (docs/core-memory-managment.md §25).
+use clust_core::{check::check, hir::Value, interpret, mir};
+use clust_frontend::{source::SourceId, testing::parse};
+use clust_semantics::OverflowChecks;
+
+const PRELUDE: &str = "use compiler_fixtures.record_5.{Cell}; use compiler_fixtures.record_6.{Hold}; pub fn inspect(u:Cell) -> i32 {return u.value;} pub fn modify(var u:Cell) -> () {u.value+=1;} pub fn store(x:Cell) -> Hold {return Hold {cell: x};} ";
+
+fn check_source(body: &str) -> Result<clust_core::hir::Program, Vec<String>> {
+    let source = format!("{PRELUDE}{body}");
+    let parsed = parse(SourceId(0), &source);
+    assert!(
+        parsed.diagnostics.is_empty(),
+        "{source}: {:?}",
+        parsed.diagnostics
+    );
+    check(&parsed.module.unwrap())
+        .map_err(|errors| errors.into_iter().map(|e| e.code.to_string()).collect())
+}
+
+fn run(body: &str) -> i128 {
+    let program = check_source(body).unwrap_or_else(|e| panic!("{body}: {e:?}"));
+    let cfg = mir::lower(&program);
+    let a = interpret::execute(
+        &program,
+        program.main.unwrap(),
+        vec![],
+        OverflowChecks::Checked,
+        10_000,
+    )
+    .unwrap();
+    let b = mir::interpret::execute(
+        &cfg,
+        cfg.main.unwrap(),
+        vec![],
+        OverflowChecks::Checked,
+        10_000,
+    )
+    .unwrap();
+    assert_eq!(a, b, "{body}");
+    let Value::Integer(n) = a else { panic!() };
+    clust_core::rust::emit(&program, OverflowChecks::Checked).unwrap();
+    n.signed_value().unwrap()
+}
+
+#[test]
+fn n01_n02_aliases_and_sequential_reborrows() {
+    for (body, expected) in [
+        // N01: several readonly aliases of one object; parent restored afterwards.
+        ("pub fn main() -> i32 {var a=Cell {value: 1};let b=a;let c=b;let t=inspect(b)+inspect(c);modify(a);return t+a.value;}", 4),
+        // N02: each child ends before its parent is used again.
+        ("pub fn main() -> i32 {var a=Cell {value: 1};var b=a;b.value+=1;var c=b;modify(c);b.value+=1;a.value+=1;return a.value;}", 5),
+        // Mutable alias of an alias chain through calls.
+        ("pub fn twice(var u:Cell) -> () {modify(u);modify(u);} pub fn main() -> i32 {var a=Cell {value: 1};twice(a);return inspect(a);}", 3),
+    ] {
+        assert_eq!(run(body), expected, "{body}");
+    }
+}
+
+#[test]
+fn n05_n06_results_carry_ownership_and_access() {
+    for (body, expected) in [
+        // N05: a fresh result permits a mutable binding.
+        ("pub fn make() -> Cell {return Cell {value: 20};} pub fn main() -> i32 {var u=make();modify(u);return u.value;}", 21),
+        ("pub fn build() -> Cell {var local=Cell {value: 20};modify(local);return local;} pub fn main() -> i32 {var u=build();modify(u);return u.value;}", 22),
+        // N06: a `var` parameter returned keeps its write access.
+        ("pub fn identity(var u:Cell) -> Cell {return u;} pub fn main() -> i32 {var owner=Cell {value: 1};var alias=identity(owner);modify(alias);return inspect(owner);}", 2),
+        // A readonly result is a view of the argument.
+        ("pub fn identity(u:Cell) -> Cell {return u;} pub fn main() -> i32 {var o=Cell {value: 5};let r=identity(o);let n=inspect(r);modify(o);return n+o.value;}", 11),
+    ] {
+        assert_eq!(run(body), expected, "{body}");
+    }
+}
+
+#[test]
+fn consuming_parameters_require_owners() {
+    for (body, expected) in [
+        // Fresh value and owner without later use: ownership is transferred.
+        ("pub fn main() -> i32 {let h=store(Cell {value: 3});return h.cell.value;}", 3),
+        ("pub fn main() -> i32 {let o=Cell {value: 4};let h=store(o);return h.cell.value;}", 4),
+        ("pub fn wrap(x:Cell,n:i32) -> Hold {if n==0 {return store(x);};return relay(x,n-1);} pub fn relay(x:Cell,n:i32) -> Hold {return wrap(x,n);} pub fn main() -> i32 {let h=wrap(Cell {value: 8},2);return h.cell.value;}", 8),
+        // Transitive consumption through a call chain.
+        ("pub fn wrap(x:Cell) -> Hold {return store(x);} pub fn main() -> i32 {let h=wrap(Cell {value: 6});return h.cell.value;}", 6),
+    ] {
+        assert_eq!(run(body), expected, "{body}");
+    }
+}
+
+#[test]
+fn n03_n09_access_and_ownership_violations_are_rejected() {
+    for (body, code) in [
+        // N03: no promotion of a readonly path, whatever the route.
+        ("pub fn main() -> i32 {let a=Cell {value: 1};var b=a;return 0;}", "E0317"),
+        ("pub fn f(u:Cell) -> () {modify(u);} pub fn main() -> i32 {return 0;}", "E0317"),
+        ("pub fn f(u:Cell) -> () {var e=u;}  pub fn main() -> i32 {return 0;}", "E0317"),
+        ("pub fn relay(u:Cell) -> Cell {return u;} pub fn relay2(u:Cell) -> Cell {return relay(u);} pub fn main() -> i32 {var o=Cell {value: 1};var e=relay2(o);return 0;}", "E0317"),
+        // Loans: a live readonly view blocks writes, a live mutable view blocks all access.
+        ("pub fn main() -> i32 {var o=Cell {value: 1};let r=o;modify(o);return inspect(r);}", "E0381"),
+        ("pub fn main() -> i32 {var o=Cell {value: 1};var w=o;modify(o);modify(w);return 0;}", "E0381"),
+        // N07: a view of a local object cannot leave the function.
+        ("pub fn bad() -> Cell {let o=Cell {value: 1};let r=o;return r;}  pub fn main() -> i32 {return 0;}", "E0395"),
+        // N08: use after the owner was consumed, or consumption under a live view.
+        ("pub fn main() -> i32 {let o=Cell {value: 1};let h=store(o);return o.value;}", "E0384"),
+        ("pub fn main() -> i32 {var o=Cell {value: 1};let r=o;let h=store(o);return r.value;}", "E0381"),
+        ("pub fn main() -> i32 {let o=Cell {value: 7};let v=o;let h=store(v);return h.cell.value;}", "NMM_NO_OWNER_TOKEN"),
+        ("pub fn main() -> i32 {let o=Cell {value: 7};let ref v=o;let h=store(v);return h.cell.value;}", "NMM_NO_OWNER_TOKEN"),
+        ("pub fn wrap(x:Cell) -> Hold {return store(x);} pub fn main() -> i32 {let o=Cell {value: 7};let v=o;let h=wrap(v);return h.cell.value;}", "NMM_NO_OWNER_TOKEN"),
+        ("pub fn main() -> i32 {let o=Cell {value: 7};let v=o;let f=store;let h=f(v);return h.cell.value;}", "NMM_NO_OWNER_TOKEN"),
+        ("pub fn wrap<T>(x:T) -> (T,) {return (x,);} pub fn main() -> i32 {let o=Cell {value: 7};let v=o;let h=wrap(v);return h.0.value;}", "NMM_NO_OWNER_TOKEN"),
+        ("pub fn borrow(x:Cell) -> Hold {let v=x;return Hold {cell: v};} pub fn main() -> i32 {let o=Cell {value: 7};let h=borrow(o);let result=store(h.cell);return result.cell.value;}", "NMM_NO_OWNER_TOKEN"),
+        // N09: a `var` parameter is a mutable borrow and cannot be consumed.
+        ("pub fn bad(var x:Cell) -> () {let h=Hold {cell: x};} pub fn main() -> i32 {return 0;}", "E0398"),
+    ] {
+        let errors = check_source(body).expect_err(&format!("accepted {body}"));
+        assert!(errors.iter().any(|c| c == code), "{body}: {errors:?}");
+    }
+}
+
+#[test]
+fn borrowed_storage_is_non_consuming_and_keeps_the_original_owner() {
+    assert_eq!(run("pub fn borrow(x:Cell) -> Hold {let v=x;return Hold {cell: v};} pub fn main() -> i32 {let o=Cell {value: 7};let h=borrow(o);return o.value+h.cell.value;}"), 14);
+}
+
+#[test]
+fn normative_counter_example_and_copy_independence() {
+    assert_eq!(run("pub class Counter {pub value:i32;new(initial:i32) {self.value=initial;};pub read(self) -> i32 {return self.value;};pub increment(var self) -> () {self.value+=1;}} pub fn advance(var counter:Counter) -> () {counter.increment();} pub fn main() -> i32 {var owner=Counter.new(10);let initial=owner.read();var first=owner;first.increment();var second=first;advance(second);first.increment();owner.increment();let result=owner;return result.read()-initial;}"), 4);
+    assert_eq!(run("pub fn main() -> i32 {let original=7;var independent=original;independent+=2;return original*10+independent;}"), 79);
+}
+
+#[test]
+fn n30_transfer_requires_reinitialization_on_every_reachable_path() {
+    assert_eq!(run("pub fn main() -> i32 {var o=Cell {value: 1};var i=0;while i<4 {let h=store(o);if i==2 {o=Cell {value: 5}} else {o=Cell {value: 2}};i+=1;};return o.value;}"), 2);
+    for body in [
+        "pub fn flag() -> bool {return true;} pub fn main() -> i32 {var o=Cell {value: 1};let h=store(o);if flag() {o=Cell {value: 2}};return o.value;}",
+        "pub fn main() -> i32 {var o=Cell {value: 1};var i=0;while i<3 {let h=store(o);i+=1;if i==2 {continue;};o=Cell {value: 2};};return 0;}",
+    ] {
+        let errors = check_source(body).expect_err(body);
+        assert!(errors.iter().any(|c| c == "E0384"), "{errors:?}");
+    }
+}
+
+#[test]
+fn n12_n13_replacement_and_alias_rebinding_have_exact_cleanup() {
+    for (source, expected) in [
+        ("use compiler_fixtures.record_4.{R}; pub fn main() -> i32 {var a=R {value: 1};let b=R {value: 2};a=R {value: 3};return 0;}", vec![1,3,2]),
+        ("use compiler_fixtures.record_4.{R}; pub fn main() -> i32 {var a=R {value: 1};var b=R {value: 2};var alias=a;alias=b;alias.value+=1;return a.value;}", vec![3,1]),
+    ] {
+        let parsed = parse(SourceId(0), source);
+        assert!(parsed.diagnostics.is_empty());
+        let p = check(&parsed.module.unwrap()).unwrap();
+        let m = mir::lower(&p);
+        mir::verify::verify(&m).unwrap();
+        let h = interpret::execute_traced(&p,p.main.unwrap(),vec![],OverflowChecks::Checked,10_000);
+        let r = mir::interpret::execute_traced(&m,m.main.unwrap(),vec![],OverflowChecks::Checked,10_000);
+        assert_eq!(h,r,"{source}");
+        assert!(h.0.is_ok());
+        let values: Vec<_> = h.1.iter().map(|event| {
+            let Value::Aggregate(fields) = &event.value else { panic!() };
+            let Value::Integer(n) = fields[0] else { panic!() };
+            n.signed_value().unwrap()
+        }).collect();
+        assert_eq!(values,expected,"{source}");
+    }
+}

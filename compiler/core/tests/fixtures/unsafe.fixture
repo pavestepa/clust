@@ -1,0 +1,16 @@
+// Safety: caller must establish value >= 0.
+ pub fn trusted_nonnegative(value: i32) -> i32 {requires_unsafe_caller();
+    return value;
+}
+
+pub fn checked_nonnegative(value: i32) -> i32 {
+    if value < 0 {return 0;}
+    if trusted_region() {
+        // Safety: the preceding check established the precondition.
+        return trusted_nonnegative(value);
+    }
+}
+
+pub fn main() -> i32 {
+    return checked_nonnegative(7);
+}

@@ -1,0 +1,154 @@
+use super::*;
+
+impl Checker<'_> {
+    pub(in super::super) fn enum_call(
+        &mut self,
+        callee: &a::Expr,
+        args: &[a::Expr],
+        expected: Option<&Type>,
+        span: Span,
+    ) -> Result<Option<h::Expr>> {
+        let a::ExprKind::Member { value, name } = &callee.kind else {
+            return Ok(None);
+        };
+        let Some((base, arguments)) = type_expression(value) else {
+            return Ok(None);
+        };
+        if self.lookup(base).is_some() {
+            return Ok(None);
+        }
+        let Some((mut ty, variant, definition)) =
+            self.enum_variant(&[base.to_owned(), name.clone()], arguments, expected, span)?
+        else {
+            return Ok(None);
+        };
+        if definition.shape != h::VariantShape::Tuple || args.len() != definition.fields.len() {
+            return Err(error(
+                span,
+                "E0360",
+                "variant payload shape or argument count mismatch",
+            ));
+        }
+        if let Some(expected) = expected {
+            same(expected, &ty, span)?;
+        }
+        let mut fields = Vec::new();
+        let Type::Enum { variants, .. } = &mut ty else {
+            unreachable!()
+        };
+        for (arg, ty) in args.iter().zip(&mut variants[variant].fields) {
+            let value = self.storage_value(arg, Some(ty))?;
+            *ty = value.ty.clone();
+            fields.push(value);
+        }
+        Ok(Some(h::Expr {
+            kind: h::ExprKind::Enum { variant, fields },
+            ty,
+            span,
+        }))
+    }
+}
+
+impl Checker<'_> {
+    pub(in super::super) fn enum_named(
+        &mut self,
+        source_ty: &a::Type,
+        args: &[(String, a::Expr)],
+        expected: Option<&Type>,
+        span: Span,
+    ) -> Result<Option<h::Expr>> {
+        let a::TypeKind::Named { path, arguments } = &source_ty.kind else {
+            return Ok(None);
+        };
+        let Some((mut ty, variant, definition)) =
+            self.enum_variant(path, arguments, expected, span)?
+        else {
+            return Ok(None);
+        };
+        let h::VariantShape::Named(names) = definition.shape else {
+            return Err(error(span, "E0360", "variant does not have named fields"));
+        };
+        if let Some(expected) = expected {
+            same(expected, &ty, span)?;
+        }
+        let mut fields = vec![None; names.len()];
+        let mut statements = Vec::new();
+        let Type::Enum { variants, .. } = &mut ty else {
+            unreachable!()
+        };
+        for (name, arg) in args {
+            let index = names
+                .iter()
+                .position(|n| n == name)
+                .ok_or_else(|| error(arg.span, "E0360", "unknown variant field"))?;
+            if fields[index].is_some() {
+                return Err(error(arg.span, "E0360", "duplicate variant field"));
+            }
+            let value = self.storage_value(arg, Some(&variants[variant].fields[index]))?;
+            variants[variant].fields[index] = value.ty.clone();
+            let id = self.locals.len();
+            self.locals.push(h::Local {
+                view: None,
+                name: format!("<variant {name}>"),
+                ty: value.ty.clone(),
+                mutable: false,
+                span: arg.span,
+            });
+            fields[index] = Some(h::Expr {
+                kind: h::ExprKind::Local(id),
+                ty: value.ty.clone(),
+                span: arg.span,
+            });
+            statements.push(h::Statement::Initialize(id, value));
+        }
+        if fields.iter().any(Option::is_none) {
+            return Err(error(
+                span,
+                "E0360",
+                "every variant field must be initialized",
+            ));
+        }
+        let construction: Vec<_> = fields
+            .iter()
+            .map(|v| {
+                let h::ExprKind::Local(id) = v.as_ref().unwrap().kind else {
+                    unreachable!()
+                };
+                id
+            })
+            .collect();
+        statements.push(h::Statement::Evaluate(h::Expr {
+            kind: h::ExprKind::Enum {
+                variant,
+                fields: fields.into_iter().map(Option::unwrap).collect(),
+            },
+            ty: ty.clone(),
+            span,
+        }));
+        Ok(Some(h::Expr {
+            kind: h::ExprKind::Block(h::Block {
+                construction: construction.clone(),
+                storage: construction,
+                statements,
+                result: ty.clone(),
+                diverges: false,
+                span,
+            }),
+            ty,
+            span,
+        }))
+    }
+}
+
+pub(super) fn type_expression(expr: &a::Expr) -> Option<(&str, &[a::TypeArgument])> {
+    match &expr.kind {
+        a::ExprKind::Name(name) => Some((name, &[])),
+        a::ExprKind::Specialize { value, arguments } => {
+            let a::ExprKind::Name(name) = &value.kind else {
+                return None;
+            };
+            Some((name, arguments))
+        }
+        _ => None,
+    }
+}

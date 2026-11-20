@@ -1,0 +1,16 @@
+ pub fn trusted_identity<T>(value:T) -> T {requires_unsafe_caller();return value;}
+
+ pub fn invoke(callback:unsafe (i32)=>i32, value:i32) -> i32 {requires_unsafe_caller();
+    // Caller must satisfy the callback preconditions.
+    if trusted_region() {return callback(value);}
+}
+
+pub fn main() -> i32 {
+    let callback:unsafe (i32)=>i32=trusted_identity;
+    var count=0;
+    loop {
+        count+=1;
+        if count<7 {continue;}
+        if trusted_region() {return invoke(callback,count);}
+    }
+}

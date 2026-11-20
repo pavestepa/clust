@@ -1,0 +1,23 @@
+[package]
+name = "clust"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+clust-runtime = { path = "../runtime" }
+clust-frontend = { path = "../compiler/frontend" }
+clust-core = { path = "../compiler/core" }
+clust-semantics = { path = "../compiler/semantics" }
+toml = { version = "=1.2.1", default-features = false, features = ["parse", "display", "std", "serde"] }
+
+[lints]
+workspace = true
+
+[dependencies.syn]
+version = "2"
+features = ["full", "visit", "visit-mut"]
+
+[dependencies.quote]
+version = "1"

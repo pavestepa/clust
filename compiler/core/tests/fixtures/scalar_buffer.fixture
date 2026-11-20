@@ -1,0 +1,9 @@
+use core.intrinsic.{RawStorage,allocate,capacity,initialize,take,drop_slot};
+// A fixed-capacity safe wrapper. The initialized prefix belongs to this buffer.
+use compiler_fixtures.record_159.{Buffer};
+pub fn main() -> i32 {
+    var buffer=Buffer.make(3);
+    buffer.push(3);
+    buffer.push(7);
+    return buffer.pop();
+}

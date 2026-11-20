@@ -1,0 +1,17 @@
+name: Compiler checks
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  compiler:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - run: test "$(uname -m)" = arm64
+      - run: rustup toolchain install 1.88.0 --profile minimal
+      - run: rustup component add --toolchain stable rustfmt clippy
+      - run: cargo +stable fmt --all -- --check
+      - run: cargo +stable clippy --locked --workspace --all-targets -- -D warnings
+      - run: cargo +1.88.0 test --locked --workspace
+        env:
+          RUSTUP_TOOLCHAIN: 1.88.0

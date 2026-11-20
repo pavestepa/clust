@@ -1,0 +1,16 @@
+[package]
+name = "clust-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+clust-semantics = { path = "../semantics" }
+clust-frontend = { path = "../frontend" }
+
+[dev-dependencies]
+clust-frontend = { path = "../frontend", features = ["compiler-tests"] }
+
+[lints]
+workspace = true
