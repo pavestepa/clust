@@ -1,8 +1,10 @@
 //! Minimal application manifests and Cargo-backed native builds.
+mod build;
+mod lock;
+mod modules;
 use std::{
-    env, fs,
+    fs,
     path::{Path, PathBuf},
-    process::Command,
 };
 
 pub struct Project {
@@ -102,61 +104,8 @@ impl Project {
         }))
     }
 
-    pub fn build(&self, source: &str, release: bool) -> Result<PathBuf, String> {
-        let directory = self.root.join("target/clust/generated");
-        fs::create_dir_all(directory.join("src")).map_err(|e| e.to_string())?;
-        let mut package = toml::Table::new();
-        for (key, value) in [
-            ("name", self.name.as_str()),
-            ("version", "0.1.0"),
-            ("edition", "2021"),
-        ] {
-            package.insert(key.into(), toml::Value::String(value.into()));
-        }
-        let mut manifest = toml::Table::new();
-        manifest.insert("package".into(), toml::Value::Table(package));
-        manifest.insert("workspace".into(), toml::Value::Table(toml::Table::new()));
-        manifest.insert(
-            "dependencies".into(),
-            toml::Value::Table(self.dependencies.clone()),
-        );
-        if let Some(checked) = self.async_overflow {
-            let mut profiles = toml::Table::new();
-            for name in ["dev", "release"] {
-                let mut profile = toml::Table::new();
-                profile.insert("overflow-checks".into(), checked.into());
-                profiles.insert(name.into(), toml::Value::Table(profile));
-            }
-            manifest.insert("profile".into(), toml::Value::Table(profiles));
-        }
-        fs::write(directory.join("Cargo.toml"), manifest.to_string()).map_err(|e| e.to_string())?;
-        fs::write(directory.join("src/main.rs"), source).map_err(|e| e.to_string())?;
-        let target = self.root.join("target/clust/artifacts");
-        let mut command =
-            Command::new(env::var_os("CLUST_CARGO").unwrap_or_else(|| "cargo".into()));
-        command
-            .args(["build", "--offline", "--manifest-path"])
-            .arg(directory.join("Cargo.toml"))
-            .arg("--target-dir")
-            .arg(&target);
-        if release {
-            command.arg("--release");
-        }
-        if let Some(compiler) = env::var_os("CLUST_RUSTC") {
-            command.env("RUSTC", compiler);
-        }
-        let output = command
-            .output()
-            .map_err(|e| format!("cannot start Cargo: {e}"))?;
-        if !output.status.success() {
-            return Err(format!(
-                "Cargo build failed: {}",
-                String::from_utf8_lossy(&output.stderr)
-            ));
-        }
-        Ok(target
-            .join(if release { "release" } else { "debug" })
-            .join(format!("{}{}", self.name, env::consts::EXE_SUFFIX)))
+    pub fn dependency_names(&self) -> impl Iterator<Item = String> + '_ {
+        self.dependencies.keys().map(|name| name.replace('-', "_"))
     }
 }
 
@@ -169,6 +118,10 @@ impl Project {
             dependencies: toml::Table::new(),
             async_overflow: None,
         }
+    }
+    pub fn with_overflow(mut self, checked: bool) -> Self {
+        self.async_overflow = Some(checked);
+        self
     }
     pub fn with_tokio(mut self, checked: bool) -> Result<Self, String> {
         self.async_overflow = Some(checked);

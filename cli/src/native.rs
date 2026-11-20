@@ -18,6 +18,9 @@ pub(super) fn execute_binary(executable: &Path, arguments: &[String]) -> Result<
         .args(arguments)
         .status()
         .map_err(|e| format!("cannot execute program: {e}"))?;
+    Ok(exit_code(status))
+}
+pub(super) fn exit_code(status: std::process::ExitStatus) -> ExitCode {
     let code = status.code().unwrap_or_else(|| {
         #[cfg(unix)]
         {
@@ -29,7 +32,7 @@ pub(super) fn execute_binary(executable: &Path, arguments: &[String]) -> Result<
             1
         }
     });
-    Ok(ExitCode::from(code as u8))
+    ExitCode::from(code as u8)
 }
 
 pub(super) fn build(

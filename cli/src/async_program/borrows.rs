@@ -34,8 +34,11 @@ fn is_copy(ty: &Type) -> bool {
         _ => false,
     }
 }
+type BorrowedInput<'a> = dyn Fn(&Expr, usize) -> bool + 'a;
 struct Uses<'a> {
+    receiver_types: BTreeMap<String, syn::Path>,
     contracts: &'a Contracts,
+    foreign: &'a BorrowedInput<'a>,
     consumed: BTreeSet<String>,
     hidden: BTreeSet<String>,
 }
@@ -53,6 +56,13 @@ impl<'ast> Visit<'ast> for Uses<'_> {
     fn visit_expr(&mut self, e: &'ast Expr) {
         match e {
             Expr::MethodCall(m) => {
+                let borrows_receiver = name(&m.receiver)
+                    .and_then(|id| self.receiver_types.get(&id.to_string()))
+                    .is_some_and(|receiver| {
+                        let method = &m.method;
+                        let callee = syn::parse_quote!(#receiver::#method);
+                        (self.foreign)(&callee, 0)
+                    });
                 if !matches!(
                     m.method.to_string().as_str(),
                     "read"
@@ -64,7 +74,8 @@ impl<'ast> Visit<'ast> for Uses<'_> {
                         | "is_err"
                         | "is_some"
                         | "is_none"
-                ) || name(&m.receiver).is_none()
+                ) && !borrows_receiver
+                    || name(&m.receiver).is_none()
                 {
                     self.visit_expr(&m.receiver);
                 }
@@ -85,7 +96,10 @@ impl<'ast> Visit<'ast> for Uses<'_> {
                     return;
                 }
                 for (i, arg) in c.args.iter().enumerate() {
-                    if modes.and_then(|m| m.get(i)) != Some(&Mode::Shared) || name(arg).is_none() {
+                    if name(arg).is_none()
+                        || (modes.and_then(|m| m.get(i)) != Some(&Mode::Shared)
+                            && !(self.foreign)(&c.func, i))
+                    {
                         self.visit_expr(arg)
                     }
                 }
@@ -100,6 +114,9 @@ impl<'ast> Visit<'ast> for Uses<'_> {
             _ => visit::visit_expr(self, e),
         }
     }
+}
+fn owned_name(id: &syn::Ident) -> syn::Ident {
+    quote::format_ident!("__clust_owned_{}", id)
 }
 fn borrowed_name(id: &syn::Ident) -> syn::Ident {
     quote::format_ident!("__clust_borrow_{}", id)
@@ -133,6 +150,8 @@ fn params(f: &ItemFn) -> Result<Vec<(syn::Ident, Mode)>, String> {
 }
 
 struct Rewrite<'a> {
+    native: bool,
+    foreign: &'a BorrowedInput<'a>,
     contracts: &'a Contracts,
     borrowed: BTreeSet<String>,
 }
@@ -172,5 +191,5 @@ impl VisitMut for Rewrite<'_> {
 
 mod inference;
 mod rewrite;
-pub(super) use self::inference::lower;
+pub(crate) use self::inference::{lower, lower_with_foreign};
 use self::rewrite::bindings;

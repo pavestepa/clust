@@ -31,3 +31,4 @@ pub(super) fn loan_errors<'a>(
         .into_iter()
         .map(move |e| borrow_check::diagnostic(f, e, code))
 }
+pub mod foreign;

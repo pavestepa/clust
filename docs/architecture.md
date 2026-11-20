@@ -18,6 +18,15 @@ Keep concrete data structures and static calls across internal module boundaries
 
 Validation uses `cargo test --workspace --locked --offline`, `cargo fmt --all -- --check` and `cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings`. The [implementation status](implementation-status.md) documents tested language behavior.
 
+## Mixed Rust applications
+
+The [native importer](../cli/src/interop/README.md) resolves mixed modules,
+reads post-expansion signatures and feeds borrow modes into COLI and Clust
+parameter inference. Cargo and rustc verify each compiled application. Mixed
+builds serialize writes to their generated package and release the lock as
+soon as a compiled program starts. Native Rust types keep their Rust layouts
+and destructors. [Supported representations and examples](rust-interop.md)
+
 ## Size profile
 
 Of the 390 Rust implementation and test files in this checkout, 350 are at or below 200 nonblank, noncomment lines. Forty exceed the guideline. The largest is the closure capture analysis (324 lines), followed by pattern binding (318), MIR instruction execution (311) and Rust operation emission (304). The guideline is a design target, not an enforced build limit.

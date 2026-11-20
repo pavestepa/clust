@@ -10,6 +10,16 @@
 | 4. Methods, generics, traits and async | Resolve inherent and trait methods, associated items and concrete generic substitutions. Let rustc enforce bounds, coherence, Send, Sync and Unpin. Cover standard String, Vec, Option and Result with representation-specific adapters. Extend the async path to retain borrow dependencies inside returned futures. | Use a crate method and a generic trait function directly from Clust. Test an awaited borrowed operation, reject a borrowed future escaping into spawn and check cancellation cleanup. Measure copies and allocations at representative boundaries. |
 | 5. Attributes and macros | Preserve attribute paths, arguments and token groups in the frontend. Route Clust semantic attributes to their checker. Apply Rust derives and attributes to a source-facing generated item whose layout and drop behavior support that attribute. Run derive, attribute, declarative and procedural function-like macros through the Rust compiler. Import expanded items before exposing them to Clust. Define which macro positions accept Rust tokens and which can produce Clust-visible declarations. | A derive on an eligible data type generates a callable trait implementation. An attribute macro generates an imported method. A function-like macro works from a local module and a dependency. Reject incompatible Copy/drop combinations and report macro failures at the Clust invocation. |
 
-The first vertical slice should call a function through the existing dotted module syntax, without a handwritten extern declaration, first from a local Rust module and then from a dependency. Add an opaque non-Copy result in the same fixture before expanding the library catalogue. This exercises name resolution, identity, ownership and native code generation through the normal CLI entry points.
+The CLI now exercises all five stages in [mixed-crate tests](../cli/tests/commands/mixed.rs).
+The [user guide](rust-interop.md) records the supported combinations. Remaining
+work includes unified rich imports in the full Clust frontend, stable metadata,
+source-mapped diagnostics and editor indexing. The table describes design goals
+and acceptance criteria, including coverage beyond the current tests.
 
-The metadata provider and exact attribute syntax need a prototype before becoming stable project interfaces. In particular, forwarding a derive to an internal tagged dispatch container can change what user code observes. Validate support against the source-facing type and keep private compiler metadata out of generated trait behavior. Unsafe imports must carry their preconditions through discovery, diagnostics and generated calls.
+## Implementation and verification order
+
+1. Resolve mixed module trees and Cargo dependency names at the normal CLI entry points.
+2. Exercise owned handles, borrowed results and exclusive access with a destructor counter and compile-fail fixtures.
+3. Test associated items, trait dispatch, generic methods and native standard-library containers.
+4. Check both an awaited borrowed future and a task that illegally outlives its owner.
+5. Test derives, attribute macros and function-like macros in the same Cargo compilation as their consumers.

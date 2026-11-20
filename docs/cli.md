@@ -1,4 +1,4 @@
-# CLI, Projects and Explicit Rust Adapters
+# CLI, Projects and Rust Integration
 
 The default source profile uses `.cl`, `new`, `self`, methods without `fn`, and arrow return types. Fields and declarations are private unless marked `pub`; constructors are always callable when their class is accessible. A private `fn main()` is a valid entry point. Every class requires one explicit constructor. Constructors cannot return early, and Clust source cannot contain unsafe blocks or locally implemented unsafe functions.
 
@@ -41,7 +41,9 @@ clust build path/to/project -o application
 
 With no input, the CLI reads `Clust.toml` in the current directory. A directory or an explicit `Clust.toml` path can also be supplied. Cargo builds use `--offline`, generate Rust and a Cargo manifest under `target/clust/generated`, retain Cargo's lockfile, and put executables under `target/clust/artifacts/debug` or `release`. Registry dependencies must already be cached. `CLUST_RUSTC` and `CLUST_CARGO` select the build tools. Object emission currently takes a source-file input rather than a manifest.
 
-## Rust Adapters
+## Explicit Rust adapters
+
+Direct module and crate calls are documented in the [native Rust guide](rust-interop.md).
 
 Declare an explicit Rust function path and its Clust signature. Clust paths use dots, including the `rust` attribute. The backend emits Rust path separators when generating the call.
 
@@ -59,7 +61,7 @@ The Rust implementation belongs to the `support` dependency. The caller uses ord
 
 The implemented boundary is deliberately limited to immutable scalar value parameters and scalar results: integers, floats, bool, char, unit and static `str`. Classes, references, mutable parameters and raw pointers are rejected at this boundary. No Clust owner or borrow may cross it implicitly. Adapter functions can be used as ordinary function values. Rust panics are caught and converted into the compiler's unwind path; initialized Clust resources are cleaned up, and a second panic during cleanup aborts.
 
-This is explicit adapter support, not arbitrary Rust API discovery or a stable foreign class ABI. General Rust ownership/lifetime contracts remain unimplemented.
+For opaque owned objects or borrowed results use the native mixed profile.
 
 ## Available Library Surface
 

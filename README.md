@@ -1,6 +1,8 @@
 # Clust
 
-![Clust logo](docs/clust_logo.svg)
+<img src="docs/clust_logo.svg" alt="Clust logo" width="160">
+
+[![Clust code showing Cat and Dog inheriting from Animal and used together in a vector](docs/clust-generic-inheritance.png)](examples/clust_generic_inheritance/main.cl)
 
 Clust is an experimental language for writing native applications with classes, methods and automatic memory cleanup. You write Clust, the compiler generates Rust, and the Rust toolchain builds an executable for your machine. You can start with Clust syntax and inspect the generated Rust whenever you want to see how a program works.
 
@@ -62,18 +64,23 @@ cargo test --locked -p clust-core --test performance -- --ignored --nocapture
 
 Clust is a working prototype with a synchronous language MVP. You can use inheritance and interfaces, write generic functions, match on results, and store owned values in strings and vectors. A single-file async program can also launch tasks on Tokio (Rust's async runtime), send messages over channels and share state through actors or mutexes. [Classes](examples/clust_animals) · [Collections](examples/clust_iteration) · [Async example](examples/clust_async/main.cl)
 
-Rust integration currently supports explicit declarations for functions with scalar inputs and outputs, such as integers. For example, this declaration lets Clust code call Rust's standard maximum function as `maximum(3, 7)`:
+Place a Rust module beside a Clust file and call its public functions directly. In the [runnable example](examples/mixed_rust/main.cl), Rust owns a handle with private fields. Clust can change its contents, borrow the resulting string and hand the handle back for cleanup.
 
 ```clust
-#[rust("std.cmp.max")]
-extern "Rust" fn maximum(left: i32, right: i32) -> i32;
+mod device;
+
+fn main() -> i32 {
+    var handle = device.make();
+    device.append(handle);
+    return device.read(handle).len() as i32;
+}
 ```
 
-These calls compile into the native program. Cargo path dependencies are supported in manifest builds. [Runnable Rust example](examples/clust_rust/main.cl) · [Implementation status](docs/implementation-status.md)
+Cargo dependencies use the same dotted call syntax. The native mixed profile also supports trait methods, borrowed futures and derives on data classes. [Rust integration guide and current limits](docs/rust-interop.md)
 
 ## Where you can contribute
 
-- **Make Rust libraries feel native.** A first milestone is calling a function from a neighboring Rust module by its dotted name, without writing an adapter. Later milestones cover owned Rust types, crates, derives and macros. [Rust integration plan](docs/rust-interop-plan.md)
+- **Extend Rust support.** Connect expanded Rust symbols to editor navigation, map generated diagnostics back to Clust, or help bring native Rust values into the full Clust inheritance pipeline. [Rust integration plan](docs/rust-interop-plan.md)
 - **Extend collection iteration.** Today's collection loop reads elements through `len` and `at`. Mutable iteration, ranges and general iterator traits are open language work. [Iteration example](examples/clust_iteration) · [Specification](SPEC.md)
 - **Help the next reader learn Clust.** Run an example and describe the first line or diagnostic you had to look up. A small example, a clearer error message or a failing test for an unsupported case gives contributors a concrete starting point. [Examples](examples) · [Language guide](docs/README.md)
 

@@ -40,3 +40,6 @@ mod published_examples_and_benchmarks;
 mod run_compiles_clust_syntax;
 #[path = "commands/scalar_output_and_assertions.rs"]
 mod scalar_output_and_assertions;
+
+#[path = "commands/mixed.rs"]
+mod mixed;

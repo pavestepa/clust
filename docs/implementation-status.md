@@ -18,7 +18,7 @@ The workspace contains `clust-frontend`, `clust-semantics`, `clust-core`, `clust
 | Library | Owned UTF-8 String, Vec growth/index/replacement, collection for loops, scalar output/assertions | `clust_string`; `clust_iteration`; native cleanup output |
 | Cleanup | Scope-exit and replacement destruction, declaration-order complete cleanup, reverse actual initialization on failure | Native partial-construction and aggregate tests |
 | Native tools | check/build/run/emit-rust, debug/release, artifacts, Clust.toml, Cargo path dependencies | CLI integration suite |
-| Rust interop | Explicit safe/unsafe scalar adapters, ordinary Clust calls, caught Rust panic and cleanup | Native adapter integration tests |
+| Rust interop | Explicit scalar adapters and direct native module/crate calls, expanded Rust APIs, owned handles, borrowed futures and derives | Native adapter integration tests |
 
 HIR and MIR reference interpreters are separate test oracles. Native tests also check independently expected values and destructor output. Passing an interpreter comparison alone is not sufficient evidence for generated unsafe Rust.
 
@@ -31,7 +31,7 @@ The synchronous compiler implements each required MVP feature category above. It
 - Closures with scoped mutable captures support local direct calls. Passing or storing those closures, general FnOnce extraction, and broader capture-type inference remain unimplemented. Borrowing and owning escaping closures have narrower checked support.
 - Weak access uses the documented `Weak<T>.with` callback API. General weak upgrade, borrowed-field targets and the old `weak` field modifier are not implemented.
 - `for` uses read-only `len`/`at` collection iteration. Mutable iteration, general iterator traits and range syntax are not implemented. Vec compound indexed assignment requires an explicit read followed by `set`.
-- Explicit Rust adapters handle scalar boundaries only. Automatic arbitrary Rust API importing, concurrency and a stable external Clust inheritance ABI are deferred by the approved scope.
+- Explicit Rust adapters handle scalar boundaries only. Direct rich imports use the [native mixed profile](rust-interop.md). Interoperability with Clust inheritance and weak identities remains limited.
 
 See [closure/weak semantics](semantics/closures-and-weak.md) and [runtime invariants](runtime-invariants.md). These restrictions describe conservative implementation boundaries; they do not prohibit later language extensions or silently relax ownership obligations. The earlier assessment is historical; its absence-of-code inventory is superseded by this document.
 

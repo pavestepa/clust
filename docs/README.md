@@ -13,6 +13,7 @@ These documents describe the language foundation, the implemented synchronous co
 | [Implementation status](implementation-status.md) | Integrated compiler components and remaining differences from the approved language. |
 | [Closures and weak references](semantics/closures-and-weak.md) | Capture, escape, exclusive access and weak identity contracts. |
 | [Runtime invariants](runtime-invariants.md) | Generated Rust storage, dispatch, cleanup and weak-access safety obligations. |
+| [Native Rust integration](rust-interop.md) | Mixed source files, Cargo dependencies, ownership, async and macros. |
 | [CLI and Rust adapters](cli.md) | Executable commands, project manifests, explicit scalar Rust imports and bundled library modules. |
 | [MVP assessment](mvp-assessment.md) | Verified implementation state, semantic gaps, reuse limits, and proposed delivery gates. |
 | [Approved MVP decisions](mvp-decisions.md) | Accepted Q01–Q10 answers, required closures and weak references, and remaining decisions. |

@@ -1,5 +1,9 @@
-# project
+# Cargo application builds
 
-Resolve Clust.toml and local dependency paths. Write a Cargo project for generated Rust, build it offline, and select its debug or release artifact. Async applications add the Tokio dependency.
+The parent project module reads Clust.toml and resolves dependency paths.
+The build module creates a Cargo package under target/clust, passes the
+selected profile and dependencies to Cargo, and returns the executable path
+and checked source. The modules helper stages the source directory layout for
+mixed applications so rustc can resolve nested modules and relative assets.
 
-Module entry: [project](../project.rs).
+Async applications add Tokio. [Project entry](../project.rs).

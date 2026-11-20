@@ -6,6 +6,8 @@ Resolve the command, source or manifest, select the appropriate compiler path an
 | --- | --- |
 | [async_program](async_program.rs) | Safe Rust lowering for scalar async applications and owned runtime handles. |
 | [main](main.rs) | `main`, `render`, `run`, `RunDirectory`, `drop` |
+| [interop](interop/README.md) | Resolve mixed modules, consume expanded Rust signatures and adapt native calls. |
+| [sync_command](sync_command.rs), [mixed_command](mixed_command.rs) | Execute synchronous Clust and mixed Cargo commands. |
 | [native](native.rs) | `execute_native`, `execute_binary`, `build` |
 | [project](project.rs) | Minimal application manifests and Cargo-backed native builds. |
 

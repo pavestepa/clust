@@ -10,6 +10,7 @@ use syn::{
 };
 
 mod borrows;
+pub(crate) use borrows::lower_with_foreign;
 
 const BUILTINS: &[&str] = &["channel", "actor", "spawn", "mutex", "drop"];
 const METHODS: &[&str] = &[

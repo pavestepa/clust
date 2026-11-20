@@ -1,8 +1,26 @@
 use super::*;
 
-pub(in super::super) fn lower(file: &mut syn::File) -> Result<(), String> {
-    let functions = file
-        .items
+pub(crate) fn lower(file: &mut syn::File) -> Result<(), String> {
+    infer(&mut file.items, &|_, _| false, false)
+}
+
+pub(crate) fn lower_with_foreign(
+    file: &mut syn::File,
+    foreign: &BorrowedInput<'_>,
+) -> Result<(), String> {
+    infer(&mut file.items, foreign, true)
+}
+fn infer(items: &mut Vec<Item>, foreign: &BorrowedInput<'_>, native: bool) -> Result<(), String> {
+    if native {
+        for item in items.iter_mut() {
+            if let Item::Mod(module) = item {
+                if let Some((_, body)) = &mut module.content {
+                    infer(body, foreign, true)?;
+                }
+            }
+        }
+    }
+    let functions = items
         .iter()
         .filter_map(|i| if let Item::Fn(f) = i { Some(f) } else { None })
         .collect::<Vec<_>>();
@@ -16,8 +34,26 @@ pub(in super::super) fn lower(file: &mut syn::File) -> Result<(), String> {
     loop {
         let mut next = contracts.clone();
         for f in &functions {
+            let receiver_types = f
+                .sig
+                .inputs
+                .iter()
+                .filter_map(|arg| {
+                    let FnArg::Typed(a) = arg else { return None };
+                    let (Pat::Ident(p), Type::Path(ty)) = (&*a.pat, &*a.ty) else {
+                        return None;
+                    };
+                    let mut path = ty.path.clone();
+                    for segment in &mut path.segments {
+                        segment.arguments = syn::PathArguments::None;
+                    }
+                    Some((p.ident.to_string(), path))
+                })
+                .collect();
             let mut uses = Uses {
+                receiver_types,
                 contracts: &contracts,
+                foreign,
                 consumed: BTreeSet::new(),
                 hidden: BTreeSet::new(),
             };
@@ -35,7 +71,7 @@ pub(in super::super) fn lower(file: &mut syn::File) -> Result<(), String> {
         contracts = next;
     }
     let mut wrappers = Vec::new();
-    for item in &mut file.items {
+    for item in items.iter_mut() {
         let Item::Fn(f) = item else { continue };
         let modes = &contracts[&f.sig.ident.to_string()];
         let mut locals = BTreeSet::new();
@@ -66,13 +102,23 @@ pub(in super::super) fn lower(file: &mut syn::File) -> Result<(), String> {
             });
         }
         Rewrite {
+            native,
+            foreign,
             contracts: &contracts,
             borrowed: locals,
         }
         .visit_block_mut(&mut f.block);
         if modes.contains(&Mode::Shared) && !modes.contains(&Mode::Exclusive) {
-            let target = borrowed_name(&f.sig.ident);
-            f.sig.ident = target.clone();
+            if native {
+                wrapper.sig.ident = owned_name(&f.sig.ident);
+                wrapper
+                    .attrs
+                    .retain(|a| a.path().is_ident("cfg") || a.path().is_ident("cfg_attr"));
+                wrapper.vis = syn::Visibility::Inherited;
+            } else {
+                f.sig.ident = borrowed_name(&f.sig.ident);
+            }
+            let target = &f.sig.ident;
             let mut call: Expr = parse_quote!(#target(#(#args),*));
             if wrapper.sig.asyncness.is_some() {
                 call = parse_quote!(#call.await)
@@ -81,6 +127,6 @@ pub(in super::super) fn lower(file: &mut syn::File) -> Result<(), String> {
             wrappers.push(Item::Fn(wrapper));
         }
     }
-    file.items.extend(wrappers);
+    items.extend(wrappers);
     Ok(())
 }

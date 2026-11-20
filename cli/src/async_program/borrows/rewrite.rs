@@ -4,13 +4,22 @@ impl Rewrite<'_> {
     pub(super) fn call(&mut self, c: &mut syn::ExprCall, spawned: bool) {
         let modes = name(&c.func).and_then(|id| self.contracts.get(&id.to_string()));
         let owned = spawned && modes.is_some_and(|m| !m.contains(&Mode::Exclusive));
-        if !owned
-            && modes.is_some_and(|m| m.contains(&Mode::Shared) && !m.contains(&Mode::Exclusive))
-        {
-            let id = borrowed_name(name(&c.func).unwrap());
-            c.func = parse_quote!(#id);
+        if modes.is_some_and(|m| m.contains(&Mode::Shared) && !m.contains(&Mode::Exclusive)) {
+            let original = name(&c.func).unwrap();
+            if owned && self.native {
+                let wrapper = owned_name(original);
+                c.func = parse_quote!(#wrapper);
+            } else if !owned && !self.native {
+                let target = borrowed_name(original);
+                c.func = parse_quote!(#target);
+            }
         }
         for (i, arg) in c.args.iter_mut().enumerate() {
+            if (self.foreign)(&c.func, i)
+                && name(arg).is_some_and(|id| self.borrowed.contains(&id.to_string()))
+            {
+                continue;
+            }
             self.visit_expr_mut(arg);
             if !owned {
                 match modes.and_then(|m| m.get(i)) {
